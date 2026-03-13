@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
+<<<<<<< HEAD
+=======
+import { getStudentSubmissions } from "@/lib/dynamodb-submissions";
+>>>>>>> e3998f95191c85358e6e96898e0604e9495b16b6
 import { getAllLabs } from "@/lib/dynamodb";
 
 export async function GET(req: NextRequest) {
@@ -10,6 +13,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+<<<<<<< HEAD
     const db = getDb();
     const submissions = db.prepare(`
       SELECT id, studentId, labId, videoUrl, status, createdAt
@@ -26,6 +30,22 @@ export async function GET(req: NextRequest) {
       ...s,
       labName: labMap.get(String(s.labId)) || "Unknown Lab",
     }));
+=======
+    const submissions = await getStudentSubmissions(user.id);
+    const allLabs = await getAllLabs();
+
+    // Attach labName to each submission so the frontend can display it
+    const enriched = submissions.map((s) => {
+      const lab = allLabs.find(l => l.id === s.labId);
+      return {
+        ...s,
+        labName: lab ? lab.labName : "Unknown Lab"
+      };
+    });
+
+    // Sort by newest first
+    enriched.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+>>>>>>> e3998f95191c85358e6e96898e0604e9495b16b6
 
     return NextResponse.json(enriched);
   } catch (error: unknown) {
