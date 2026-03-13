@@ -28,7 +28,7 @@ export async function invokeModel(
   const command = new ConverseCommand({
     modelId:
       process.env.BEDROCK_MODEL_ID ||
-      "us.anthropic.claude-sonnet-4-6",
+      "us.anthropic.claude-opus-4-6-v1",
     system: [{ text: systemPrompt }],
     messages: messages.map((m) => ({
       role: m.role as "user" | "assistant",

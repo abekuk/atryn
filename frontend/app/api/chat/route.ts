@@ -43,14 +43,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Call Gemini API
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "Gemini API key not configured" }, { status: 500 });
-    }
-
-    const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    // Call AWS Bedrock Converse API
+    const { BedrockRuntimeClient, ConverseCommand } = await import(
+      "@aws-sdk/client-bedrock-runtime"
+    );
 
     const labContext = labs.map((l: Record<string, unknown>) =>
       `- ${l.labName} (${l.department}): ${l.description} Topics: ${l.topics}. Professor: ${l.professorName}`
@@ -70,41 +66,54 @@ ${labContext}
 
 Based on the student's query, suggest relevant labs and explain why they might be a good fit. If no labs match, suggest the student try different research keywords.`;
 
-    const contents = [
+    const bedrockMessages = [
       ...(conversationHistory || []).map((m: { role: string; content: string }) => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
+        role: m.role as "user" | "assistant",
+        content: [{ text: m.content }],
       })),
-      { role: "user", parts: [{ text: message }] },
+      { role: "user" as const, content: [{ text: message }] },
     ];
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents,
-        generationConfig: { maxOutputTokens: 1024, temperature: 0.7 },
-      }),
-    });
+    try {
+      const region = process.env.AWS_REGION || "us-west-2";
+      const modelId = process.env.BEDROCK_MODEL_ID || "us.anthropic.claude-opus-4-6-v1";
+      console.log("Bedrock config:", { region, modelId, hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID, hasSessionToken: !!process.env.AWS_SESSION_TOKEN });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error("Gemini API error:", errText);
+      const client = new BedrockRuntimeClient({
+        region,
+        credentials: {
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+          sessionToken: process.env.AWS_SESSION_TOKEN,
+        },
+      });
+
+      const command = new ConverseCommand({
+        modelId,
+        system: [{ text: systemPrompt }],
+        messages: bedrockMessages,
+        inferenceConfig: {
+          maxTokens: 1024,
+          temperature: 0.7,
+        },
+      });
+
+      const bedrockResponse = await client.send(command);
+      const reply =
+        bedrockResponse.output?.message?.content?.[0]?.text ||
+        "I can help you discover research labs at U of T. Try asking about specific research areas!";
+
+      return NextResponse.json({
+        reply,
+        labs: matchedLabs.length > 0 ? matchedLabs : undefined,
+      });
+    } catch (bedrockError) {
+      console.error("Bedrock API error:", bedrockError);
       return NextResponse.json({
         reply: "I found some relevant labs for you below! Click on any lab to learn more.",
         labs: matchedLabs.length > 0 ? matchedLabs : undefined,
       });
     }
-
-    const data = await response.json();
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "I can help you discover research labs at U of T. Try asking about specific research areas!";
-
-    return NextResponse.json({
-      reply,
-      labs: matchedLabs.length > 0 ? matchedLabs : undefined,
-    });
   } catch (error: unknown) {
     console.error("Chat error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

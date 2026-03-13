@@ -18,7 +18,7 @@ export async function getAllResources(): Promise<Resource[]> {
     );
 
     const client = new DynamoDBClient({
-      region: process.env.AWS_REGION || "us-east-1",
+      region: process.env.AWS_REGION || "us-west-2",
     });
     const docClient = DynamoDBDocumentClient.from(client);
 

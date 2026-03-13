@@ -112,7 +112,7 @@ All records are sample data for demo purposes.
 |----------|---------|-------------|
 | `MOCK_AI` | `true` | Stub Bedrock responses |
 | `USE_DYNAMO` | `false` | Read from DynamoDB vs seed JSON |
-| `AWS_REGION` | `us-east-1` | AWS region |
+| `AWS_REGION` | `us-west-2` | AWS region |
 | `DYNAMO_TABLE` | `CampusResources` | DynamoDB table name |
 | `BEDROCK_MODEL_ID` | `anthropic.claude-opus-4-6-v1` | Bedrock model |
 
