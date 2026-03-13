@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getLabById } from "@/lib/dynamodb";
 
 export async function GET(
   req: NextRequest,
@@ -7,14 +7,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const db = getDb();
-    const lab = db.prepare(`
-      SELECT l.id, l.labName, l.topics, l.description, l.department,
-             p.name as professorName, p.email as professorEmail
-      FROM labs l
-      LEFT JOIN professors p ON l.professorId = p.id
-      WHERE l.id = ?
-    `).get(Number(id));
+    const lab = await getLabById(Number(id));
 
     if (!lab) {
       return NextResponse.json({ error: "Lab not found" }, { status: 404 });

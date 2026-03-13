@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { getAllLabs } from "@/lib/dynamodb";
 
 const MOCK_MODE = process.env.MOCK_AI === "true";
 
@@ -11,13 +11,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Message required" }, { status: 400 });
     }
 
-    // Get labs from database for context
-    const db = getDb();
-    const labs = db.prepare(`
-      SELECT l.*, p.name as professorName, p.email as professorEmail
-      FROM labs l
-      LEFT JOIN professors p ON l.professorId = p.id
-    `).all();
+    // Get labs from DynamoDB for context
+    const labs = await getAllLabs();
 
     // Search labs by keyword matching
     const tokens = message.toLowerCase().split(/\s+/).filter(Boolean);

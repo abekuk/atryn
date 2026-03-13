@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,11 +20,24 @@ const WELCOME_MESSAGE: ChatMessage = {
 
 export default function ChatPage() {
   const { token } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (typeof window !== "undefined") {
+      const saved = sessionStorage.getItem("atryn-chat");
+      if (saved) {
+        try { return JSON.parse(saved); } catch { /* ignore */ }
+      }
+    }
+    return [WELCOME_MESSAGE];
+  });
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Save messages to sessionStorage so they survive navigation
+  useEffect(() => {
+    sessionStorage.setItem("atryn-chat", JSON.stringify(messages));
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -113,7 +127,13 @@ export default function ChatPage() {
                       : "bg-gray-50 border border-gray-100 text-gray-700 rounded-tl-sm"
                   }`}
                 >
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                  {msg.role === "assistant" ? (
+                    <div className="prose prose-sm prose-gray max-w-none [&>h3]:text-base [&>h3]:font-semibold [&>h3]:mt-3 [&>h3]:mb-1 [&>h2]:text-lg [&>h2]:font-semibold [&>h2]:mt-3 [&>h2]:mb-1 [&>ul]:my-1 [&>ol]:my-1 [&>p]:my-1">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  )}
 
                   {/* Lab cards */}
                   {msg.labs && msg.labs.length > 0 && (
@@ -189,6 +209,7 @@ export default function ChatPage() {
             <button
               onClick={() => {
                 setMessages([WELCOME_MESSAGE]);
+                sessionStorage.removeItem("atryn-chat");
               }}
               className="text-gray-300 hover:text-primary transition-colors p-2"
               title="New chat"
