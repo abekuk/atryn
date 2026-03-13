@@ -71,7 +71,7 @@ export default function ProfessorLoginPage() {
               <Input
                 id="prof-email"
                 type="email"
-                placeholder="you@utoronto.ca"
+                placeholder="you@mail.utoronto.ca"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

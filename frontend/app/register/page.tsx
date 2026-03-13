@@ -86,7 +86,7 @@ export default function RegisterPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="you@utoronto.ca"
+                placeholder="you@mail.utoronto.ca"
                 value={form.email}
                 onChange={(e) => update("email", e.target.value)}
                 required
