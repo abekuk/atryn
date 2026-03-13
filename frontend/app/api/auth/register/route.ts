@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { getDb } from "@/lib/db";
+import { getUserByEmail, createUser } from "@/lib/dynamodb-users";
 import { signToken } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
@@ -12,7 +12,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const db = getDb();
+    const existing = await getUserByEmail(email);
+    if (existing) {
+      return NextResponse.json({ error: "Email already registered" }, { status: 409 });
+    }
+
     const hashedPassword = bcrypt.hashSync(password, 10);
 
     if (role === "student") {
@@ -21,17 +25,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Missing program or year" }, { status: 400 });
       }
 
-      const existing = db.prepare("SELECT id FROM students WHERE email = ?").get(email);
-      if (existing) {
-        return NextResponse.json({ error: "Email already registered" }, { status: 409 });
-      }
-
-      const result = db.prepare(
-        "INSERT INTO students (name, email, password, program, year, interests) VALUES (?, ?, ?, ?, ?, ?)"
-      ).run(name, email, hashedPassword, program, Number(year), interests || "");
+      const user = await createUser({
+        email,
+        role: "student",
+        name,
+        password: hashedPassword,
+        program,
+        year: Number(year),
+        interests: interests ?? "",
+      });
 
       const token = signToken({
-        id: Number(result.lastInsertRowid),
+        id: user.userId,
         email,
         role: "student",
         name,
@@ -40,13 +45,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         token,
         user: {
-          id: Number(result.lastInsertRowid),
+          id: user.userId,
           role: "student",
           name,
           email,
           program,
           year: Number(year),
-          interests: interests || "",
+          interests: interests ?? "",
         },
       });
     }
@@ -57,28 +62,26 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Missing department or labName" }, { status: 400 });
       }
 
-      const existing = db.prepare("SELECT id FROM professors WHERE email = ?").get(email);
-      if (existing) {
-        return NextResponse.json({ error: "Email already registered" }, { status: 409 });
-      }
+      const user = await createUser({
+        email,
+        role: "professor",
+        name,
+        password: hashedPassword,
+        department,
+        labName,
+      });
 
-      const result = db.prepare(
-        "INSERT INTO professors (name, email, password, department, labName) VALUES (?, ?, ?, ?, ?)"
-      ).run(name, email, hashedPassword, department, labName);
-
-      const profId = Number(result.lastInsertRowid);
-
-      // Auto-create a lab for the professor
-      db.prepare(
-        "INSERT INTO labs (labName, professorId, topics, description, department) VALUES (?, ?, '', '', ?)"
-      ).run(labName, profId, department);
-
-      const token = signToken({ id: profId, email, role: "professor", name });
+      const token = signToken({
+        id: user.userId,
+        email,
+        role: "professor",
+        name,
+      });
 
       return NextResponse.json({
         token,
         user: {
-          id: profId,
+          id: user.userId,
           role: "professor",
           name,
           email,

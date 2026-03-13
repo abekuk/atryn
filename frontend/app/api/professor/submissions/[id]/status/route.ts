@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
+import { getSubmissions, updateSubmissionStatus } from "@/lib/dynamodb-submissions";
 
 export async function PATCH(
   req: NextRequest,
@@ -19,27 +19,18 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
 
-    const db = getDb();
-
-    // Verify the submission belongs to the professor's lab
-    const submission = db.prepare(`
-      SELECT s.id, l.professorId
-      FROM submissions s
-      JOIN labs l ON s.labId = l.id
-      WHERE s.id = ?
-    `).get(Number(id)) as { id: number; professorId: number } | undefined;
+    const submissions = await getSubmissions();
+    const submission = submissions.find(
+      (s) => s.id === id || s.submissionId === id
+    );
 
     if (!submission) {
       return NextResponse.json({ error: "Submission not found" }, { status: 404 });
     }
 
-    if (submission.professorId !== user.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    await updateSubmissionStatus(submission.submissionId ?? id, status);
 
-    db.prepare("UPDATE submissions SET status = ? WHERE id = ?").run(status, Number(id));
-
-    return NextResponse.json({ id: Number(id), status });
+    return NextResponse.json({ id, status });
   } catch (error: unknown) {
     console.error("Status update error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

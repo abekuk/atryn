@@ -5,7 +5,7 @@ export interface AuthResponse {
 }
 
 export interface StudentUser {
-  id: number;
+  id: number | string;
   role: "student";
   name: string;
   email: string;
@@ -15,7 +15,7 @@ export interface StudentUser {
 }
 
 export interface ProfessorUser {
-  id: number;
+  id: number | string;
   role: "professor";
   name: string;
   email: string;
@@ -40,9 +40,9 @@ export interface Lab {
 
 // --- Submission ---
 export interface Submission {
-  id: number;
-  studentId: number;
-  labId: number;
+  id: number | string;
+  studentId: number | string;
+  labId: number | string;
   videoUrl: string;
   status: "pending" | "shortlisted" | "rejected";
   createdAt: string;

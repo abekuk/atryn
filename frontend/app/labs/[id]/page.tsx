@@ -57,9 +57,12 @@ export default function LabDetailPage({ params }: { params: Promise<{ id: string
       }
     }
 
-    // Create submission
+    // Create submission via API Gateway
+    const apiBase = process.env.NEXT_PUBLIC_API_GATEWAY_URL || "";
+    const submissionsUrl = apiBase ? `${apiBase.replace(/\/$/, "")}/submissions` : "/api/submissions";
+
     try {
-      const res = await fetch("/api/submissions", {
+      const res = await fetch(submissionsUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

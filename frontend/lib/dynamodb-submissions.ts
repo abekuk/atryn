@@ -1,7 +1,7 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, PutCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
-const TABLE_NAME = "submission";
+const TABLE_NAME = process.env.DYNAMO_SUBMISSIONS_TABLE || "Submission";
 const REGION = process.env.AWS_REGION || "us-west-2";
 
 const client = new DynamoDBClient({
@@ -17,26 +17,37 @@ const client = new DynamoDBClient({
 const docClient = DynamoDBDocumentClient.from(client);
 
 export interface DynamoSubmission {
-  id: string; // The DynamoDB partition key (uuid)
+  id: string;
+  submissionId: string; // DynamoDB partition key
   studentId: number;
   studentName?: string;
   studentEmail?: string;
   studentProgram?: string;
   studentYear?: number;
   studentInterests?: string;
-  labId: number;
+  labId: number | string;
   labName?: string;
   videoUrl: string;
   status: "pending" | "shortlisted" | "rejected";
   createdAt: string;
 }
 
-export async function createSubmission(sub: Omit<DynamoSubmission, "id" | "createdAt" | "status">) {
-  const item: DynamoSubmission = {
+/** Raw item from DynamoDB (uses submissionId as partition key) */
+type DynamoSubmissionItem = Omit<DynamoSubmission, "id"> & { id?: string };
+
+function toSubmission(item: DynamoSubmissionItem): DynamoSubmission {
+  const id = item.submissionId ?? item.id ?? "";
+  return { ...item, id };
+}
+
+export async function createSubmission(sub: Omit<DynamoSubmission, "id" | "submissionId" | "createdAt" | "status">) {
+  const submissionId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const createdAt = new Date().toISOString();
+  const item: DynamoSubmissionItem = {
     ...sub,
-    id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    submissionId,
     status: "pending",
-    createdAt: new Date().toISOString(),
+    createdAt,
   };
 
   await docClient.send(
@@ -46,7 +57,7 @@ export async function createSubmission(sub: Omit<DynamoSubmission, "id" | "creat
     })
   );
 
-  return item;
+  return toSubmission(item);
 }
 
 export async function getSubmissions() {
@@ -55,12 +66,14 @@ export async function getSubmissions() {
       TableName: TABLE_NAME,
     })
   );
-  return (result.Items || []) as DynamoSubmission[];
+  const items = (result.Items || []) as DynamoSubmissionItem[];
+  return items.map(toSubmission);
 }
 
-export async function getStudentSubmissions(studentId: number) {
+export async function getStudentSubmissions(studentId: number | string) {
   const all = await getSubmissions();
-  return all.filter((s) => s.studentId === studentId);
+  const idStr = String(studentId);
+  return all.filter((s) => String(s.studentId) === idStr);
 }
 
 export async function getProfessorSubmissions(professorLabNameMatches: string) {
@@ -77,7 +90,7 @@ export async function updateSubmissionStatus(id: string, status: "shortlisted" |
   await docClient.send(
     new UpdateCommand({
       TableName: TABLE_NAME,
-      Key: { id },
+      Key: { submissionId: id },
       UpdateExpression: "SET #st = :s",
       ExpressionAttributeNames: { "#st": "status" },
       ExpressionAttributeValues: { ":s": status },

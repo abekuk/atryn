@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
+import { getSubmissions } from "@/lib/dynamodb-submissions";
 import { getAllLabs } from "@/lib/dynamodb";
+import { getUserById } from "@/lib/dynamodb-users";
 
 export async function GET(req: NextRequest) {
   try {
@@ -10,27 +11,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = getDb();
-
-    // Get all submissions with student info
-    const submissions = db.prepare(`
-      SELECT s.id, s.studentId, s.labId, s.videoUrl, s.status, s.createdAt,
-             st.name as studentName, st.email as studentEmail,
-             st.program as studentProgram, st.year as studentYear,
-             st.interests as studentInterests
-      FROM submissions s
-      LEFT JOIN students st ON s.studentId = st.id
-      ORDER BY s.createdAt DESC
-    `).all() as Record<string, unknown>[];
-
-    // Look up lab names from DynamoDB
+    const submissions = await getSubmissions();
     const labs = await getAllLabs();
     const labMap = new Map(labs.map((l) => [String(l.id), l.labName]));
 
-    const enriched = submissions.map((s) => ({
-      ...s,
-      labName: labMap.get(String(s.labId)) || "Unknown Lab",
-    }));
+    const enriched = await Promise.all(
+      submissions.map(async (s) => {
+        const student =
+          s.studentId != null ? await getUserById(String(s.studentId)) : null;
+        return {
+          ...s,
+          labName: labMap.get(String(s.labId)) ?? "Unknown Lab",
+          studentName: student?.name ?? s.studentName,
+          studentEmail: student?.email ?? s.studentEmail,
+          studentProgram: student?.program ?? s.studentProgram,
+          studentYear: student?.year ?? s.studentYear,
+          studentInterests: student?.interests ?? s.studentInterests,
+        };
+      })
+    );
+
+    enriched.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
     return NextResponse.json(enriched);
   } catch (error: unknown) {

@@ -5,7 +5,7 @@ import type { AppUser } from "@/types";
 const JWT_SECRET = process.env.JWT_SECRET || "atryn-dev-secret-key-change-in-production";
 
 export interface TokenPayload {
-  id: number;
+  id: number | string; // userId (string) from DynamoDB or legacy numeric id
   email: string;
   role: "student" | "professor";
   name: string;

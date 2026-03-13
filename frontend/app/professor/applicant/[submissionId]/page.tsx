@@ -42,7 +42,7 @@ function ApplicantContent({ params }: { params: Promise<{ submissionId: string }
       .then((r) => r.json())
       .then((data) => {
         const found = (data as Submission[]).find(
-          (s) => s.id === Number(submissionId)
+          (s) => String(s.id) === submissionId
         );
         setSubmission(found || null);
         setLoading(false);
