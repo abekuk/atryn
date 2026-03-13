@@ -1,65 +1,54 @@
-// Google Gemini integration with mock mode fallback
+// AWS Bedrock integration with mock mode fallback
 // Set MOCK_AI=true to use stub responses during local development
+// Uses the Converse API for cleaner multi-turn conversations
 
 const MOCK_MODE = process.env.MOCK_AI === "true";
 
-interface GeminiMessage {
+interface Message {
   role: string;
   content: string;
 }
 
 export async function invokeModel(
   systemPrompt: string,
-  messages: GeminiMessage[]
+  messages: Message[]
 ): Promise<string> {
   if (MOCK_MODE) {
     return mockResponse(messages);
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY environment variable is required");
-  }
+  const { BedrockRuntimeClient, ConverseCommand } = await import(
+    "@aws-sdk/client-bedrock-runtime"
+  );
 
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-  const contents = messages.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
-
-  const payload = {
-    system_instruction: {
-      parts: [{ text: systemPrompt }],
-    },
-    contents,
-    generationConfig: {
-      maxOutputTokens: 1024,
-      temperature: 0.7,
-    },
-  };
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+  const client = new BedrockRuntimeClient({
+    region: process.env.AWS_REGION || "us-west-2",
   });
 
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error("Gemini API error:", errText);
-    throw new Error(`Gemini API error: ${response.status}`);
-  }
+  const command = new ConverseCommand({
+    modelId:
+      process.env.BEDROCK_MODEL_ID ||
+      "us.anthropic.claude-sonnet-4-6",
+    system: [{ text: systemPrompt }],
+    messages: messages.map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: [{ text: m.content }],
+    })),
+    inferenceConfig: {
+      maxTokens: 1024,
+      temperature: 0.7,
+    },
+  });
 
-  const data = await response.json();
+  const response = await client.send(command);
+  const outputContent = response.output?.message?.content;
   return (
-    data.candidates?.[0]?.content?.parts?.[0]?.text ||
+    outputContent?.[0]?.text ||
     "I'm sorry, I couldn't generate a response."
   );
 }
 
-function mockResponse(messages: GeminiMessage[]): string {
+function mockResponse(messages: Message[]): string {
   const lastMsg = messages[messages.length - 1]?.content || "";
 
   if (lastMsg.includes("email") || lastMsg.includes("draft")) {

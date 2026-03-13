@@ -1,5 +1,5 @@
 import { getResourceById } from "../../shared/data";
-import { invokeModel } from "../../shared/gemini";
+import { invokeModel } from "../../shared/bedrock";
 import { SYSTEM_PROMPT, itemQAPrompt } from "../../shared/prompts";
 import { AskRequest, AskResponse } from "../../shared/types";
 

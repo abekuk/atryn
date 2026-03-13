@@ -1,6 +1,6 @@
 import { getAllResources } from "../../shared/data";
 import { searchResources } from "../../shared/search";
-import { invokeModel } from "../../shared/gemini";
+import { invokeModel } from "../../shared/bedrock";
 import { SYSTEM_PROMPT, interestSummaryPrompt } from "../../shared/prompts";
 import { ChatRequest, ChatResponse } from "../../shared/types";
 
