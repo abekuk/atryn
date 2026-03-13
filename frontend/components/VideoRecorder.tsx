@@ -41,6 +41,7 @@ export default function VideoRecorder({ onVideoReady, maxDuration = 60 }: VideoR
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
     } catch (err) {
       console.error("Camera access denied:", err);
@@ -49,9 +50,15 @@ export default function VideoRecorder({ onVideoReady, maxDuration = 60 }: VideoR
   };
 
   const startRecording = async () => {
-    await startCamera();
+    // Switch to recording mode first so the <video> element is in the DOM
+    setMode("recording");
     chunksRef.current = [];
     setTimeLeft(maxDuration);
+
+    // Wait a tick for React to render the video element
+    await new Promise((r) => setTimeout(r, 100));
+
+    await startCamera();
 
     const stream = streamRef.current;
     if (!stream) return;
@@ -73,7 +80,6 @@ export default function VideoRecorder({ onVideoReady, maxDuration = 60 }: VideoR
     };
 
     recorder.start(1000);
-    setMode("recording");
 
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
