@@ -20,15 +20,16 @@ const WELCOME_MESSAGE: ChatMessage = {
 
 export default function ChatPage() {
   const { token } = useAuth();
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    if (typeof window !== "undefined") {
-      const saved = sessionStorage.getItem("atryn-chat");
-      if (saved) {
-        try { return JSON.parse(saved); } catch { /* ignore */ }
-      }
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("atryn-chat");
+    if (saved) {
+      try { setMessages(JSON.parse(saved)); } catch { /* ignore */ }
     }
-    return [WELCOME_MESSAGE];
-  });
+    setHydrated(true);
+  }, []);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -36,8 +37,10 @@ export default function ChatPage() {
 
   // Save messages to sessionStorage so they survive navigation
   useEffect(() => {
-    sessionStorage.setItem("atryn-chat", JSON.stringify(messages));
-  }, [messages]);
+    if (hydrated) {
+      sessionStorage.setItem("atryn-chat", JSON.stringify(messages));
+    }
+  }, [messages, hydrated]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -137,27 +140,43 @@ export default function ChatPage() {
 
                   {/* Lab cards */}
                   {msg.labs && msg.labs.length > 0 && (
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-3 space-y-3">
                       {msg.labs.map((lab: Lab) => (
                         <Link
                           key={lab.id}
                           href={`/labs/${lab.id}`}
-                          className="block bg-white border border-gray-200 rounded-xl p-3 hover:shadow-sm transition-shadow"
+                          className="block bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow"
                         >
                           <div className="flex items-start gap-2">
-                            <FlaskConical className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-                            <div>
-                              <p className="font-medium text-primary text-sm">
+                            <FlaskConical className="w-5 h-5 text-primary mt-0.5 shrink-0" />
+                            <div className="min-w-0">
+                              <p className="font-semibold text-primary text-sm">
                                 {lab.labName}
                               </p>
-                              {lab.professorName && (
+                              {(lab.department || lab.professorName) && (
                                 <p className="text-xs text-gray-400 mt-0.5">
-                                  {lab.professorName} - {lab.department}
+                                  {lab.department && <>Department: {lab.department}</>}
+                                  {lab.department && lab.professorName && " | "}
+                                  {lab.professorName && <>Professor: {lab.professorName}</>}
                                 </p>
                               )}
-                              <p className="text-xs text-gray-500 mt-1 line-clamp-2">
-                                {lab.description?.slice(0, 120)}...
-                              </p>
+                              {lab.description && (
+                                <p className="text-xs text-gray-600 mt-2 leading-relaxed">
+                                  {lab.description}
+                                </p>
+                              )}
+                              {lab.topics && (
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {lab.topics.split(",").map((topic: string) => (
+                                    <span
+                                      key={topic.trim()}
+                                      className="text-[10px] bg-primary/5 text-primary px-2 py-0.5 rounded-full"
+                                    >
+                                      {topic.trim()}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </Link>

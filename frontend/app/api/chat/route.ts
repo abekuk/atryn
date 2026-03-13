@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     if (MOCK_MODE) {
       const reply = matchedLabs.length > 0
-        ? `I found ${matchedLabs.length} research labs that match your interests. Take a look at the results below - click any lab to learn more and submit your introduction!`
+        ? `I found ${matchedLabs.length} research labs that match your interests. Check out the results below and click any lab to learn more!`
         : `I can help you discover research labs, professors, and topics at U of T. Try asking about specific areas like "machine learning", "robotics", "cybersecurity", or "biomedical AI".`;
 
       return NextResponse.json({
@@ -49,17 +49,20 @@ export async function POST(req: NextRequest) {
 
     const systemPrompt = `You are Atryn, a research discovery assistant for students at the University of Toronto. You help students find research labs, professors, and research topics.
 
-IMPORTANT RULES:
-- Only discuss research labs, professors, and research topics
-- Do NOT recommend campus services, mental health services, career offices, or non-research resources
-- Be concise and helpful
-- Never use em-dashes. Use regular hyphens instead
-- Refer to yourself as "Atryn" (not "ATRYN")
+CRITICAL RULES:
+- NEVER list individual labs, professor names, or departments in your text. The system displays matching labs as clickable cards automatically below your message. Your text must NOT duplicate them.
+- Write only a short 1-3 sentence summary describing what types of research you found (e.g. "I found some labs focused on optical imaging, medical devices, and biophotonics that relate to your interest in 3D imaging.").
+- Do NOT use bullet points, numbered lists, or headings to describe labs.
+- Do NOT name any specific lab or professor.
+- Only discuss research labs and research topics.
+- Do NOT recommend campus services, mental health services, career offices, or non-research resources.
+- Never use em-dashes. Use regular hyphens instead.
+- Refer to yourself as "Atryn" (not "ATRYN").
 
-Available research labs at U of T:
+Available research labs at U of T (for your internal reference only, do NOT list these in your response):
 ${labContext}
 
-Based on the student's query, suggest relevant labs and explain why they might be a good fit. If no labs match, suggest the student try different research keywords.`;
+Respond with ONLY a brief friendly summary. The labs will be shown as interactive cards separately.`;
 
     const bedrockMessages = [
       ...(conversationHistory || []).map((m: { role: string; content: string }) => ({
@@ -88,7 +91,7 @@ Based on the student's query, suggest relevant labs and explain why they might b
         system: [{ text: systemPrompt }],
         messages: bedrockMessages,
         inferenceConfig: {
-          maxTokens: 1024,
+          maxTokens: 150,
           temperature: 0.7,
         },
       });
@@ -98,9 +101,20 @@ Based on the student's query, suggest relevant labs and explain why they might b
         bedrockResponse.output?.message?.content?.[0]?.text ||
         "I can help you discover research labs at U of T. Try asking about specific research areas!";
 
+      // Find any labs mentioned in the AI response that keyword matching missed
+      const replyLower = reply.toLowerCase();
+      const matchedIds = new Set(matchedLabs.map((l: Record<string, unknown>) => l.id));
+      const mentionedLabs = labs.filter((lab: Record<string, unknown>) => {
+        if (matchedIds.has(lab.id)) return false;
+        const labName = (lab.labName as string).toLowerCase();
+        return replyLower.includes(labName);
+      });
+
+      const allLabs = [...matchedLabs, ...mentionedLabs];
+
       return NextResponse.json({
         reply,
-        labs: matchedLabs.length > 0 ? matchedLabs : undefined,
+        labs: allLabs.length > 0 ? allLabs : undefined,
       });
     } catch (bedrockError) {
       console.error("Bedrock API error:", bedrockError);
