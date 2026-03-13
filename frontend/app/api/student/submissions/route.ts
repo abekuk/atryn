@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
 import { getAuthUser } from "@/lib/auth";
+import { getStudentSubmissions } from "@/lib/dynamodb-submissions";
+import { getAllLabs } from "@/lib/dynamodb";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,17 +10,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const db = getDb();
-    const submissions = db.prepare(`
-      SELECT s.id, s.studentId, s.labId, s.videoUrl, s.status, s.createdAt,
-             l.labName
-      FROM submissions s
-      LEFT JOIN labs l ON s.labId = l.id
-      WHERE s.studentId = ?
-      ORDER BY s.createdAt DESC
-    `).all(user.id);
+    const submissions = await getStudentSubmissions(user.id);
+    const allLabs = await getAllLabs();
 
-    return NextResponse.json(submissions);
+    // Attach labName to each submission so the frontend can display it
+    const enriched = submissions.map((s) => {
+      const lab = allLabs.find(l => l.id === s.labId);
+      return {
+        ...s,
+        labName: lab ? lab.labName : "Unknown Lab"
+      };
+    });
+
+    // Sort by newest first
+    enriched.sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return NextResponse.json(enriched);
   } catch (error: unknown) {
     console.error("Student submissions error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
