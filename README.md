@@ -39,7 +39,7 @@
 | **Hosting** | AWS Amplify | Production deployment |
 | **Compute** | AWS Lambda | Serverless API handlers |
 | **AI** | Amazon Bedrock (Claude Opus 4.6) | Conversational research discovery via Converse API |
-| **Storage** | Amazon S3 (`atryn-videos` bucket) | Video introduction uploads |
+| **Storage** | Amazon S3 | Video introduction uploads |
 | **Database** | Amazon DynamoDB | Labs, users, submissions |
 
 ## Tech Stack
