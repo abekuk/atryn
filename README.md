@@ -2,7 +2,7 @@
 
 *All the Research You Need*
 
-**ATRYN** is an AI-powered research discovery platform for the University of Toronto. Students can chat with an AI assistant to find research labs, connect with professors, and submit video introductions.
+**ATRYN** is an AI-powered research discovery platform for the University of Toronto. Students can chat with an AI assistant to find research opportunities, connect with professors, and submit video introductions.
 
 [**CHECK IT OUT**](https://devpost.com/software/atryn)
 
